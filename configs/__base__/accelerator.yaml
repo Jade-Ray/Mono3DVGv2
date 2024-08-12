@@ -1,0 +1,13 @@
+# * Accelerator parameters
+gradient_accumulation_steps:
+  desc: Number of updates steps to accumulate before performing a backward/update pass.
+  value: 1
+with_tracking:
+  desc: Whether to enable experiment trackers for logging.
+  value: True
+report_to:
+  desc: The integration to report the results and logs to. Supported platforms are [tensorboard](https://www.tensorflow.org/tensorboard) or [wandb](https://www.wandb.ai). Only applicable when `--with_tracking` is `True`.
+  value: wandb
+project_name: 
+  desc: The name of the project to log the results and logs to. Only applicable when `--with_tracking` is `True`.
+  value: 'mono3dvg-v2'

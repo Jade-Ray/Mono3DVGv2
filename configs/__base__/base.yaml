@@ -1,0 +1,46 @@
+output_dir:
+  desc: The output directory where the model predictions and checkpoints will be written.
+  value: outputs
+cache_dir:
+  desc: The directory where the model checkpoints will be written.
+  value: cache
+seed:
+  desc: The random seed
+  value: 42
+dataloader_num_workers:
+  desc: Number of workers to use for the dataloaders.
+  value: 4
+num_train_epochs:
+  desc: Number of epochs to train the model.
+  value: 60
+resume_from_checkpoint:
+  desc: If the training should continue from a checkpoint folder.
+  value: null
+
+# * Optimizer parameters
+learning_rate:
+  desc: Initial learning rate (after the potential warmup period) to use.
+  value: 1.0e-4
+adam_beta1:
+  desc: Beta1 for AdamW optimize.
+  value: 0.9
+adam_beta2:
+  desc: Beta2 for AdamW optimizer.
+  value: 0.999
+adam_epsilon:
+  desc: Epsilon for AdamW optimizer.
+  value: 1.0e-8
+weight_decay:
+  desc: Weight decay to use.
+  value: 1.0e-4
+
+lr_scheduler:
+  type:
+    desc: The scheduler type to use. Choose between ["linear", "cosine", "constant", "constant_with_warmup", "multi_step"]
+    value: multi_step
+  num_warmup_steps:
+    desc: Number of steps for the warmup in the lr scheduler.
+    value: 500
+  decay_rate: 0.1
+  decay_list: [40]
+

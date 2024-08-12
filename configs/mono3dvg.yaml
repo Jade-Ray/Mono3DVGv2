@@ -1,0 +1,3 @@
+__base__:
+  - __base__/base.yaml
+  - __base__/mono3drefer_dataset.yaml

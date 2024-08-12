@@ -1,0 +1,16 @@
+# * Datasets parameters
+dataset:
+  name: JadeRay-42/Mono3DRefer
+  cache_dir: cache
+  use_3d_center: True
+  bbox2d_type: 'anno'
+  meanshape: False
+  clip_2d: False
+
+  aug_pd: True
+  aug_crop: True
+
+  random_flip: 0.5
+  random_crop: 0.5
+  scale: 0.05
+  shift: 0.05

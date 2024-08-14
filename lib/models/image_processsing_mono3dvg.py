@@ -412,10 +412,10 @@ class Mono3DVGImageProcessor(BaseImageProcessor):
         
         out_angle, out_size_3d, out_depth = outputs.pred_angle, outputs.pred_3d_dim, outputs.pred_depth
         
-        boxes = torch.gather(out_bbox, 1, topk_boxes.repeat(1, 1, 6)) # b, q', 6
-        angle_heading = torch.gather(out_angle, 1, topk_boxes.repeat(1, 1, 24)) # b, q', 24 
-        depth = torch.gather(out_depth, 1, topk_boxes.repeat(1, 1, 2)) # b, q', 2
-        size_3d = torch.gather(out_size_3d, 1, topk_boxes.repeat(1, 1, 3)) # b, q', 3
+        boxes = torch.gather(out_bbox, 1, topk_boxes.repeat(1, 1, 6)) # b, tk, 6
+        angle_heading = torch.gather(out_angle, 1, topk_boxes.repeat(1, 1, 24)) # b, tk, 24 
+        depth = torch.gather(out_depth, 1, topk_boxes.repeat(1, 1, 2)) # b, tk, 2
+        size_3d = torch.gather(out_size_3d, 1, topk_boxes.repeat(1, 1, 3)) # b, tk, 3 => h, w, l
         # and from relative [0, 1] to absolute [0, height] coordinates
         if isinstance(target_sizes, List):
             img_w = torch.Tensor([i[0] for i in target_sizes])
@@ -425,27 +425,32 @@ class Mono3DVGImageProcessor(BaseImageProcessor):
         scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1).to(boxes.device) # b, 4
         
         # 2d bboxes decoding
-        boxes_2d = box_cxcylrtb_to_xyxy(boxes) * scale_fct[:, None, :] # b, q', 4
-        cx_2d = box_xyxy_to_cxcywh(boxes_2d)[..., 0] # b, q'
+        boxes_2d = box_cxcylrtb_to_xyxy(boxes) * scale_fct[:, None, :] # b, tk, 4
+        cx_2d = box_xyxy_to_cxcywh(boxes_2d)[..., 0] # b, tk
         
         # 3d bboxes (dimensions + positions) decoding
-        cx_3d = boxes[..., 0] * img_w[:, None] # b, q'
-        cy_3d = boxes[..., 1] * img_h[:, None] # b, q'
-        depth_rect = depth[..., 0] # b, q'
+        cx_3d = boxes[..., 0] * img_w[:, None] # b, tk
+        cy_3d = boxes[..., 1] * img_h[:, None] # b, tk
+        depth_rect = depth[..., 0] # b, tk
         
-        rect_h = (cx_3d - calibs[:, 0, 2]) * depth_rect / calibs[:, 0, 0] + calibs[:, 0, 3] / - calibs[:, 0, 0]
-        rect_w = (cy_3d - calibs[:, 1, 2]) * depth_rect / calibs[:, 1, 1] + calibs[:, 1, 3] / - calibs[:, 1, 1]
-        rect_l = depth_rect
-        pos_rect = torch.stack([rect_h, rect_w, rect_l], dim=2) # b, q', 3
-        boxes_3d = torch.cat([size_3d, pos_rect], dim=2) # b, q', 6 => x, y, z, h, w, l
+        cu, fu = calibs[:, 0, 2][:, None], calibs[:, 0, 0][:, None]
+        tx = calibs[:, 0, 3][:, None] / -fu
+        cv, fv = calibs[:, 1, 2][:, None], calibs[:, 1, 1][:, None]
+        ty = calibs[:, 1, 3][:, None] / -fv
+        rect_x = (cx_3d - cu) * depth_rect / fu + tx
+        rect_y = (cy_3d - cv) * depth_rect / fv + ty
+        rect_z = depth_rect
+        pos_rect = torch.stack([rect_x, rect_y, rect_z], dim=2) # b, tk, 3
+        pos_rect[..., 1] += size_3d[..., 0] / 2 # (x, y, z) -> (x, y + h/2, z)
+        boxes_3d = torch.cat([size_3d, pos_rect], dim=2) # b, tk, 6 => h, w, l, x, y, z
         # angle heading decoding
         heading_bin, heading_res = angle_heading.split([12, 12], dim=2)
-        cls_ind = torch.argmax(heading_bin, dim=2) # b, q'
-        heading_res = torch.gather(heading_res, 2, cls_ind.unsqueeze(2)).squeeze(2) # b, q'
-        angle = (cls_ind.float() * (2 * torch.pi / 12) + heading_res) # b, q'
+        cls_ind = torch.argmax(heading_bin, dim=2) # b, tk
+        heading_res = torch.gather(heading_res, 2, cls_ind.unsqueeze(2)).squeeze(2) # b, tk
+        angle = (cls_ind.float() * (2 * torch.pi / 12) + heading_res) # b, tk
         angle = torch.where(angle > torch.pi, angle - 2 * torch.pi, angle)
-        
-        rotation_y = angle + torch.arctan2(cx_2d - calibs[:, 0, 2], calibs[:, 0, 0])
+
+        rotation_y = angle + torch.arctan2(cx_2d - cu, fu)
         rotation_y = torch.where(rotation_y > torch.pi, rotation_y - 2 * torch.pi, rotation_y)
         rotation_y = torch.where(rotation_y < -torch.pi, rotation_y + 2 * torch.pi, rotation_y)
         

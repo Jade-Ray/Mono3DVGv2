@@ -173,6 +173,12 @@ def main():
         
         logger.info("***** Running evaluation *****")
         metrics = evaluation(model, image_processor, accelerator, valid_dataloader, epoch, logger)
+        msg = (
+            f'Accuracy@0.25: {metrics['Overall_Acc@0.25']}%\t'
+            f'Accuracy@0.5: {metrics['Overall_Acc@0.5']}%\t'
+            f'Mean IoU: {metrics['Overall_MeanIoU']}%\t'
+        )
+        logger.info(f"Final Evaluation Result: " + msg)
         eval_result = metrics['Overall_Acc@0.25'] + metrics['Overall_Acc@0.25']
         if eval_result > extra_state.best_result:
             extra_state.best_eval_result = eval_result

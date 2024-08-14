@@ -80,12 +80,12 @@ class IOU3DMetric(object):
         self._input_validator(preds, target)
         
         for pred_item, gt_item in zip(preds, target):
-            pred_box3D = pred_item['boxes_3d']
+            pred_box3D = pred_item['boxes_3d'][0] # Only calculate for top-1 prediction
             gt_box3D = gt_item['boxes_3d']
             instanceID = gt_item['instance_id']
             # (dim, loc) -> (loc, dim)
-            pred_box3D = np.array(pred_box3D, dtype=np.float32).transpose(3, 4, 5, 0, 1, 2)
-            gt_box3D = np.array(gt_box3D, dtype=np.float32).transpose(3, 4, 5, 0, 1, 2)
+            pred_box3D = np.array([pred_box3D[3], pred_box3D[4], pred_box3D[5], pred_box3D[0], pred_box3D[1], pred_box3D[2]], dtype=np.float32)
+            gt_box3D = np.array([gt_box3D[3], gt_box3D[4], gt_box3D[5], gt_box3D[0], gt_box3D[1], gt_box3D[2]], dtype=np.float32)
             # real 3D center in 3D space is (x, y, z) - (0, h/2, 0)
             pred_box3D[1] -= pred_box3D[3] / 2
             gt_box3D[1] -= gt_box3D[3] / 2
@@ -142,7 +142,8 @@ def evaluation(
     metric = IOU3DMetric()
     
     for step, batch in enumerate(tqdm(dataloader, disable=not accelerator.is_local_main_process)):
-        batch = Mono3DVGImageProcessor.prepare_batch(batch)
+        batch = Mono3DVGImageProcessor.prepare_batch(batch, return_info=True)
+        info = nested_to_cpu(batch.pop("info"))
         with torch.no_grad():
             outputs = model(**batch)
         
@@ -150,13 +151,12 @@ def evaluation(
 
         # 1. Collect predicted 3Dboxes, classes, scores
         # image_processor convert boxes from size_3d, box and depth predict to Real 3D box format [cx, cy, cz, h, w, l] in absolute coordinates.
-        predictions = image_processor.post_process_3d_object_detection(outputs, batch["calibs"], target_sizes=batch["img_sizes"])
+        predictions = image_processor.post_process_3d_object_detection(outputs, batch["calibs"], target_sizes=batch["img_sizes"], top_k=1)
         predictions = nested_to_cpu(predictions)
 
         # 2. Collect ground truth boxes in the same format for metric computation
         # Do the same, convert 3D boxes to Pascal VOC format
         target = []
-        info = nested_to_cpu(batch["info"])
         for gt_3dbox, instance_id in zip(info['gt_3dbox'], info['instance_id']):
             target.append({"boxes_3d": gt_3dbox, "instance_id": instance_id})
         

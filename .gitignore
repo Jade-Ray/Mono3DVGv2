@@ -175,3 +175,6 @@ pretrained-models/
 
 # Server configs
 /ServerConfigs/
+
+# ipython
+*.ipynb

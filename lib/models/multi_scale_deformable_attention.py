@@ -14,6 +14,7 @@ from transformers.utils import (
     is_ninja_available,
 )
 from transformers.models.deformable_detr.load_custom import load_cuda_kernels
+from transformers.utils.import_utils import _is_package_available
 
 from .configuration_mono3dvg_v2 import Mono3DVGv2Config
 
@@ -27,6 +28,9 @@ if is_torch_cuda_available() and is_ninja_available():
     except Exception as e:
         logger.warning(f"Could not load the custom kernel for multi-scale deformable attention: {e}")
         MSDA = None
+        if _is_package_available("MultiScaleDeformableAttention"):
+            logger.info("Loading compiled CUDA kernels...")
+            import MultiScaleDeformableAttention as MSDA
 else:
     MSDA = None
 

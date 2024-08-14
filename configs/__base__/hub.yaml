@@ -1,14 +1,13 @@
 # * The hugging face hub parameters
-hub:
-  push_to_hub:
-    desc: Whether or not to push the model to the Hub.
-    value: False
-  hub_token:
-    desc: The token to use to push to the Model Hub.
-    value: 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
-  hub_model_id:
-    desc: The name of the repository to keep in sync with the local `output_dir`.
-    value: null
-  private_repo:
-    desc: Whether or not to create a private repository.
-    value: False
+push_to_hub:
+  desc: Whether or not to push the model to the Hub.
+  value: False
+hub_token:
+  desc: The token to use to push to the Model Hub.
+  value: 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
+hub_model_id:
+  desc: The name of the repository to keep in sync with the local `output_dir`.
+  value: null
+private_repo:
+  desc: Whether or not to create a private repository.
+  value: False

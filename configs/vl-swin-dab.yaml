@@ -1,15 +1,13 @@
 __base__:
   - __base__/base.yaml
   - __base__/accelerator.yaml
+  - __base__/hub.yaml
   - __base__/mono3drefer_dataset.yaml
 
 # Accelerator
 with_tracking: False
 report_to: 'wandb'
 project_name: 'mono3dvg-v2'
-
-dataset:
-  name: Mono3DRefer
 
 model:
   num_labels: 9
@@ -41,6 +39,12 @@ model:
   decoder_depth_residual: False
   decoder_text_residual: False
   use_text_guided_adapter: True
+
+lr_scheduler:
+  type: multi_step
+  num_warmup_steps: 500
+  decay_rate: 0.1
+  decay_list: [40]
 
 # Training
 output_dir: outputs/vl-swin-dab

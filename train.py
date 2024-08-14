@@ -139,8 +139,8 @@ def main():
         
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(model):
-                batch = Mono3DVGImageProcessor.prepare_batch(batch, return_info=True)
-                outputs = model(**batch)
+                batch = Mono3DVGImageProcessor.prepare_batch(batch)
+                outputs = model(**batch, output_attentions=False, output_hidden_states=False)
                 loss = outputs.loss
                 if cfg.with_tracking:
                     total_loss += loss.detach().float()

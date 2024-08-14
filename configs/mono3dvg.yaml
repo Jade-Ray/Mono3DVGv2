@@ -1,3 +1,7 @@
 __base__:
   - __base__/base.yaml
   - __base__/mono3drefer_dataset.yaml
+
+train_batch_size: &batch_size 10
+valid_batch_size: *batch_size
+test_batch_size: *batch_size

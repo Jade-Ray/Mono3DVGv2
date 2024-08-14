@@ -62,10 +62,10 @@ class SwinVisionBackbone(nn.Module):
         if "swin" in backbone_model_type:
             for name, parameter in self.model.named_parameters():
                 if config.use_timm_backbone:
-                    if "layers_1" not in name and "layers_2" not in name and "layers_3" not in name:
+                    if config.freeze_backbone or "layers_1" not in name and "layers_2" not in name and "layers_3" not in name:
                         parameter.requires_grad_(False)
                 else:
-                    if "stage.1" not in name and "stage.2" not in name and "stage.3" not in name:
+                    if config.freeze_backbone or "stage.1" not in name and "stage.2" not in name and "stage.3" not in name:
                         parameter.requires_grad_(False)
     
     def forward(self, pixel_values: torch.Tensor, pixel_mask: torch.Tensor=None):

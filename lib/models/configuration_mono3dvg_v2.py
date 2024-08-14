@@ -173,6 +173,7 @@ uncertainty loss in the object detection loss.
         position_embedding_type="sine",
         backbone="resnet50",
         use_pretrained_backbone=True,
+        freeze_backbone=True,
         num_feature_levels=4,
         text_encoder_type="roberta-base",
         num_text_output_layers=1,
@@ -211,6 +212,7 @@ uncertainty loss in the object detection loss.
                 backbone_config = config_class.from_dict(backbone_config)
         self.use_timm_backbone = use_timm_backbone
         self.backbone_config = backbone_config
+        self.freeze_backbone = freeze_backbone
         self.num_channels = num_channels
         self.num_queries = num_queries
         self.d_model = d_model

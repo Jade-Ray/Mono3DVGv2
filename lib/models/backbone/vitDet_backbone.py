@@ -60,7 +60,7 @@ class VitDetVisionBackbone(nn.Module):
         backbone_model_type = config.backbone if config.use_timm_backbone else config.backbone_config.model_type
         if "vit" in backbone_model_type:
             for name, parameter in self.model.named_parameters():
-                if "blocks.23" not in name: # large vit model with 24 blocks
+                if config.freeze_backbone or "blocks.23" not in name: # large vit model with 24 blocks
                     parameter.requires_grad_(False)
     
     def forward(self, pixel_values: torch.Tensor, pixel_mask: torch.Tensor=None):

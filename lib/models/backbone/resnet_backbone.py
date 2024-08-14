@@ -119,10 +119,10 @@ class ResNetVisionBackbone(nn.Module):
         if "resnet" in backbone_model_type:
             for name, parameter in self.model.named_parameters():
                 if config.use_timm_backbone:
-                    if "layer2" not in name and "layer3" not in name and "layer4" not in name:
+                    if config.freeze_backbone or "layer2" not in name and "layer3" not in name and "layer4" not in name:
                         parameter.requires_grad_(False)
                 else:
-                    if "stage.1" not in name and "stage.2" not in name and "stage.3" not in name:
+                    if config.freeze_backbone or "stage.1" not in name and "stage.2" not in name and "stage.3" not in name:
                         parameter.requires_grad_(False)
 
     # Copied from transformers.models.detr.modeling_detr.DetrConvEncoder.forward with Detr->DeformableDetr

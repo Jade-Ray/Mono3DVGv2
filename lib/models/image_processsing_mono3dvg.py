@@ -246,8 +246,8 @@ class Mono3DVGImageProcessor(BaseImageProcessor):
         """
         H, W = image_size
         norm_annotation = annotation.copy()
-        norm_annotation["targets"]["boxes"] = annotation["targets"]["boxes"] / np.array([W, H, W, H])   # (cx, cy, w, h)
-        norm_annotation["targets"]["boxes_3d"] = annotation["targets"]["boxes_3d"] / np.array([W, H, W, W, H, H])   # (cx, cy, l, r, t, b)
+        norm_annotation["targets"]["boxes"] = annotation["targets"]["boxes"] / np.array([W, H, W, H], dtype=np.float32)   # (cx, cy, w, h)
+        norm_annotation["targets"]["boxes_3d"] = annotation["targets"]["boxes_3d"] / np.array([W, H, W, W, H, H], dtype=np.float32)   # (cx, cy, l, r, t, b)
         return norm_annotation
 
     def preprocess(
@@ -485,7 +485,7 @@ class Mono3DVGImageProcessor(BaseImageProcessor):
             "pixel_values": batch["pixel_values"],
             "calibs": batch["calibs"],
             "captions": batch["captions"],
-            "img_size": batch["info"]["img_size"],
+            "img_sizes": batch["info"]["img_size"],
             "labels": labels_list,
         }
         

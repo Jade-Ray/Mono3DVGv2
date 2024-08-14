@@ -169,7 +169,7 @@ outputs/
 *.bin
 
 # Data dir
-/Mono3DRefer/
+/Mono3DRefer/*.arrow
 cache/
 pretrained-models/
 

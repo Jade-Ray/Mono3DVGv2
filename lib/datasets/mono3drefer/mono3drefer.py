@@ -19,8 +19,8 @@ from utils.parser import dict_to_namespace
 
 def format_object3d_annotations(caption: str, calib: Calibration, object: Namespace, info: Namespace) -> dict:
     # encoding 2d/3d boxes
-    center_box2d = corners_to_center_format(object.box2d) # (cx, cy, w, h)
-    box3d = np.concatenate([object.center_3d, object.center_3d - object.box2d[0:2], object.box2d[2:4] - object.center_3d], axis=0) # (cx, cy, l, r, t, b)
+    center_box2d = corners_to_center_format(object.box2d).astype(np.float32) # (cx, cy, w, h)
+    box3d = np.concatenate([object.center_3d, object.center_3d - object.box2d[0:2], object.box2d[2:4] - object.center_3d], axis=0, dtype=np.float32) # (cx, cy, l, r, t, b)
     
     # encoding heading angle
     heading_angle = calib.ry2alpha(object.ry, (object.box2d[0] + object.box2d[2]) / 2)
@@ -52,7 +52,7 @@ def format_object3d_annotations(caption: str, calib: Calibration, object: Namesp
             'labels': np.array([info.category], dtype=np.int8), # (1,)
             'boxes': center_box2d[np.newaxis, ...], # (1, 4)
             'boxes_3d': box3d[np.newaxis, ...], # (1, 6)
-            'depth': np.array([object.pos[-1]], dtype=np.float32), # (1, 1)
+            'depth': np.array([[object.pos[-1]]], dtype=np.float32), # (1, 1)
             'size_3d': size_3d[np.newaxis, ...], # (1, 3)
             'heading_bin': heading_bin[np.newaxis, ...], # (1, 1)
             'heading_res': heading_res[np.newaxis, ...], # (1, 1)
@@ -155,12 +155,12 @@ def build_dataset(cfg, accelerator: Accelerator = None):
     
     if accelerator is None:
         train_dataset = dataset["train"].with_transform(train_transform_batch)
-        valid_dataset = dataset["validation"].with_transform(validation_transform_batch)
+        valid_dataset = dataset["val"].with_transform(validation_transform_batch)
         test_dataset = dataset["test"].with_transform(validation_transform_batch)
     else:
         with accelerator.main_process_first():
             train_dataset = dataset["train"].with_transform(train_transform_batch)
-            valid_dataset = dataset["validation"].with_transform(validation_transform_batch)
+            valid_dataset = dataset["val"].with_transform(validation_transform_batch)
             test_dataset = dataset["test"].with_transform(validation_transform_batch)
         
     

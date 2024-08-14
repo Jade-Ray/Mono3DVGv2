@@ -175,6 +175,12 @@ class Mono3DVGv2ForSingleObjectDetectionOutput(ModelOutput):
             Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_queries, num_heads, 4, 4)`.
             Attentions weights of the decoder's cross-attention layer, after the attention softmax, used to compute the
             weighted average in the cross-attention heads.
+        encoder_last_hidden_state (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
+            Sequence of hidden-states at the output of the last layer of the encoder of the model.
+        encoder_attentions (`tuple(torch.FloatTensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, sequence_length, num_heads, 4,
+            4)`. Attentions weights of the encoder, after the attention softmax, used to compute the weighted average
+            in the self-attention heads.
         intermediate_hidden_states (`torch.FloatTensor` of shape `(batch_size, config.decoder_layers, num_queries, hidden_size)`):
             Stacked intermediate hidden states (output of each layer of the decoder).
         intermediate_reference_points (`torch.FloatTensor` of shape `(batch_size, config.decoder_layers, num_queries, 4)`):
@@ -199,6 +205,8 @@ class Mono3DVGv2ForSingleObjectDetectionOutput(ModelOutput):
     decoder_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     decoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
     cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
+    encoder_last_hidden_state: Optional[torch.FloatTensor] = None
+    encoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
 
 
 def _get_clones(module, N):
@@ -254,7 +262,7 @@ class TextGuidedAdapter(nn.Module):
     def with_pos_embed(self, tensor, pos):
         return tensor if pos is None else tensor + pos
 
-    def get_reference_points(spatial_shapes, valid_ratios, device):
+    def get_reference_points(self, spatial_shapes, valid_ratios, device):
         reference_points_list = []
         for lvl, (H_, W_) in enumerate(spatial_shapes):
 
@@ -328,7 +336,7 @@ class TextGuidedAdapter(nn.Module):
         # the reference points of img is non-learnable meshgrid
         reference_points_input = self.get_reference_points(spatial_shapes, src_valid_ratios, src.device)
         
-        text_cond_img_ctx = self.img2img_msdeform_attn(
+        text_cond_img_ctx, _ = self.img2img_msdeform_attn(
             hidden_states=src,
             attention_mask=orig_multiscale_masks,
             encoder_hidden_states=orig_multiscale_img_feat,
@@ -896,7 +904,7 @@ class Mono3DVGv2Model(Mono3DVGv2PreTrainedModel):
         
         # Extract multi-scale feature maps of same resolution `config.d_model` (cf Figure 4 in paper)
         # First, sent pixel_values + pixel_mask through Backbone to obtain the features which is a list of tuples
-        features, position_embeddings_list = self.backbone(pixel_values, pixel_mask)
+        features, position_embeddings_list = self.vision_backbone(pixel_values, pixel_mask)
         
         # Then, apply 1x1 convolution to reduce the channel dimension to d_model (256 by default)
         sources = []
@@ -916,7 +924,7 @@ class Mono3DVGv2Model(Mono3DVGv2PreTrainedModel):
                 else:
                     source = self.input_proj[level](sources[-1])
                 mask = nn.functional.interpolate(pixel_mask[None].float(), size=source.shape[-2:]).to(torch.bool)[0]
-                pos_l = self.backbone.position_embedding(source, mask).to(source.dtype)
+                pos_l = self.vision_backbone.position_embedding(source, mask).to(source.dtype)
                 sources.append(source)
                 masks.append(mask)
                 position_embeddings_list.append(pos_l)
@@ -984,7 +992,6 @@ class Mono3DVGv2Model(Mono3DVGv2PreTrainedModel):
             [m.permute(0, 2, 1).reshape(-1, self.d_model, H_, W_) for m, (H_, W_) in zip(vision_embeds.split(level_index_num, dim=1), spatial_shapes)],
             mask_flatten.split(level_index_num, dim=1)[1].reshape(-1, *spatial_shapes[1]),
             lvl_pos_embed_flatten.split(level_index_num, dim=1)[1].permute(0, 2, 1).reshape(-1, self.d_model, *spatial_shapes[1]),
-            None, None, None, None, None
         )
         depth_embeds = depth_embeds.flatten(2).permute(0, 2, 1) # bs, H_1*W_1, d_model
         depth_attention_mask = masks[1].flatten(1) # bs, H_1*W_1
@@ -992,7 +999,7 @@ class Mono3DVGv2Model(Mono3DVGv2PreTrainedModel):
         
         # Sixth, prepare text-guided adapter 
         if self.use_text_guided_adapter:
-            img_feat_orig2adapt, depth_feat_orig2adapt = self.TextGuidedAdapter(
+            img_feat_orig2adapt, depth_feat_orig2adapt = self.text_guided_adapter(
                 img_feat_src=vision_embeds, 
                 masks=mask_flatten, 
                 img_pos_embeds=lvl_pos_embed_flatten,
@@ -1007,14 +1014,13 @@ class Mono3DVGv2Model(Mono3DVGv2PreTrainedModel):
             img_feat_srcs = img_feat_orig2adapt.chunk(2, dim=-1)
             vision_embeds = img_feat_srcs[1]
             depth_feat_srcs = depth_feat_orig2adapt.chunk(2, dim=-1)
-            depth_adapt_k = depth_feat_srcs[1].transpose(0, 1) # bs, H_1*W_1, d_model
+            depth_adapt_k = depth_feat_srcs[1] # bs, H_1*W_1, d_model
         
         # Sixth, prepare decoder inputs
         batch_size, _, num_channels = vision_embeds.shape
         if self.use_dab:
-            query_embed = query_embed.unsqueeze(0).expand(batch_size, -1, -1) # (bs, nq, d_model+6)
-            target = query_embed[..., :self.d_model] # (bs, nq, d_model)
-            reference_points = query_embed[..., self.d_model:].sigmoid() # (bs, nq, 6)
+            target = self.target_embeddings.weight.unsqueeze(0).expand(batch_size, -1, -1) # (bs, nq, d_model)
+            reference_points = self.refpoint_embeddings.weight.unsqueeze(0).expand(batch_size, -1, -1).sigmoid() # (bs, nq, 6)
             init_reference_points = reference_points
         else:
             query_embed, target = torch.split(query_embeds, num_channels, dim=1)
@@ -1329,7 +1335,7 @@ class Mono3DVGv2ForSingleObjectDetection(Mono3DVGv2PreTrainedModel):
         model = cls(config)
         
         logger.info(f"==> Loading from Mono3DVG '{pretrained_model_name_or_path}'")
-        checkpoint = torch.load(pretrained_model_name_or_path, map_location="cpu")
+        checkpoint = torch.load(pretrained_model_name_or_path, map_location="cpu", weights_only=False)
         
         new_state_dict = {}
         state_dict = checkpoint['model_state']
@@ -1465,7 +1471,7 @@ class Mono3DVGv2Loss(nn.Module):
         target_classes = torch.full(
             source_logits.shape[:2], self.num_classes, dtype=torch.int64, device=source_logits.device
         )
-        target_classes[idx] = target_classes_o
+        target_classes[idx] = target_classes_o.squeeze().long()
 
         target_classes_onehot = torch.zeros(
             [source_logits.shape[0], source_logits.shape[1], source_logits.shape[2] + 1],
@@ -1789,7 +1795,7 @@ class Mono3DVGv2HungarianMatcher(nn.Module):
         out_bbox3d = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 6]
         
         # Also concat the target labels and boxes
-        target_ids = torch.cat([v["class_labels"] for v in targets])
+        target_ids = torch.cat([v["labels"] for v in targets]).long()
         tgt_bbox3d = torch.cat([v["boxes_3d"] for v in targets])
 
         # Compute the classification cost.

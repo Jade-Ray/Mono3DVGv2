@@ -150,7 +150,7 @@ def evaluation(
 
         # 1. Collect predicted 3Dboxes, classes, scores
         # image_processor convert boxes from size_3d, box and depth predict to Real 3D box format [cx, cy, cz, h, w, l] in absolute coordinates.
-        predictions = image_processor.post_process_3d_object_detection(outputs, batch["calibs"], target_sizes=batch["img_size"])
+        predictions = image_processor.post_process_3d_object_detection(outputs, batch["calibs"], target_sizes=batch["img_sizes"])
         predictions = nested_to_cpu(predictions)
 
         # 2. Collect ground truth boxes in the same format for metric computation

@@ -21,9 +21,9 @@ class SinePositionEmbedding(nn.Module):
     used by the Attention is all you need paper, generalized to work on images.
     """
     
-    def __init__(self, num_pos_feats=64, temperature=10000, normalize=False, scale=None):
+    def __init__(self, embedding_dim=64, temperature=10000, normalize=False, scale=None):
         super().__init__()
-        self.num_pos_feats = num_pos_feats
+        self.embedding_dim = embedding_dim
         self.temperature = temperature
         self.normalize = normalize
         if scale is not None and normalize is False:

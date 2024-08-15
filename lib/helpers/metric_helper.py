@@ -134,7 +134,7 @@ def evaluation(
     image_processor: Mono3DVGImageProcessor,
     accelerator: Accelerator,
     dataloader: DataLoader,
-    epoch: int,
+    epoch: int = None,
     logger: logging.Logger = None,
     only_overall: bool = True,
 ) -> dict:
@@ -165,7 +165,7 @@ def evaluation(
         if step % 30 == 0 and logger is not None:
             metrics = metric.compute(only_overall=True)
             msg = (
-                    f'Evaluation: [{epoch}][{step}/{len(dataloader)}]\t'
+                    f'Evaluation: [{epoch}][{step}/{len(dataloader)}]\t' if epoch is not None else f'Epoch: [{step}/{len(dataloader)}]\t'
                     f'Loss_mono3dvg: {outputs.loss.item():.2f}\t'
                     f'Accu25: {metrics['Overall_Acc@0.25']*100:.2f}%\t'
                     f'Accu5: {metrics['Overall_Acc@0.5']*100:.2f}%\t'

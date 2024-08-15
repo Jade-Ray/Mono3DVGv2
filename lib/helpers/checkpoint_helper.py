@@ -54,9 +54,12 @@ class CustomCheckpoint(object):
 
 def get_resume_chekpoint_path(resume_chekpoint_path: str = None, output_path: str = None):
     if resume_chekpoint_path is not None or resume_chekpoint_path != "":
-        return Path(resume_chekpoint_path)
+        path = Path(resume_chekpoint_path)
     else:
-        return get_last_checkpoint(output_path)
+        path = get_last_checkpoint(output_path)
+    
+    assert path.exists(), f"Checkpoint file not found: {path}"
+    return path
 
 
 def make_checkpoint_dir(path_to_job, is_master_proc=True):

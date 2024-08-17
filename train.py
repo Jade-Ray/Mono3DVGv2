@@ -185,7 +185,7 @@ def main():
         metrics = evaluation(model, image_processor, accelerator, valid_dataloader, epoch, logger)
         msg = (
             f'Accuracy@0.25: {metrics['Overall_Acc@0.25']:.2f}%\t'
-            f'Accuracy@0.5: {metrics['Overall_Acc@0.5']::.2f}%\t'
+            f'Accuracy@0.5: {metrics['Overall_Acc@0.5']:.2f}%\t'
             f'Mean IoU: {metrics['Overall_MeanIoU']:.2f}%\t'
         )
         logger.info(f"Final Evaluation Result: " + msg)

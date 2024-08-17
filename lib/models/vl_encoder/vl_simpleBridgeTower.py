@@ -91,7 +91,7 @@ class VisionLanguageSimpleBridgeEncoder(nn.Module):
         reference_points = get_reference_points(
             spatial_shapes, valid_ratios, device=vision_embeds.device
         )
-        vision_embeds, _ = self.v_encoder_layers[0](
+        vision_encoder_outputs = self.v_encoder_layers[0](
             hidden_states=vision_embeds,
             attention_mask=vision_attention_mask,
             position_embeddings=position_embeddings,
@@ -100,6 +100,7 @@ class VisionLanguageSimpleBridgeEncoder(nn.Module):
             level_start_index=level_start_index,
             output_attentions=output_attentions,
         )
+        vision_embeds = vision_encoder_outputs[0]
         
         # first layer is a special case because we don't have the output from the cross-encoder yet
         cross_modal_text = text_embeds[0]
@@ -146,7 +147,7 @@ class VisionLanguageSimpleBridgeEncoder(nn.Module):
         
         link_layer_index = 0
         for i in range(1, self.num_layers):
-            vision_embeds, _ = self.v_encoder_layers[i](
+            vision_encoder_outputs = self.v_encoder_layers[i](
                 hidden_states=vision_embeds,
                 attention_mask=vision_attention_mask,
                 position_embeddings=position_embeddings,
@@ -155,6 +156,7 @@ class VisionLanguageSimpleBridgeEncoder(nn.Module):
                 level_start_index=level_start_index,
                 output_attentions=output_attentions,
             )
+            vision_embeds = vision_encoder_outputs[0]
             image_embeds_with_ln = self.v_ln_post(vision_embeds) + image_token_type_embeddings
             
             text_link_tower = self.cross_modal_text_link_tower[link_layer_index]

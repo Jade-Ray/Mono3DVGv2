@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import cv2
 
@@ -25,7 +26,7 @@ def generate_corners3d(l, h, w, ry, pos):
 
 class Calibration(object):
     def __init__(self, calib_file):
-        if isinstance(calib_file, str):
+        if isinstance(calib_file, (str, Path)):
             calib = Calibration.get_calib_from_file(calib_file)
         else:
             calib = calib_file

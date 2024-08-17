@@ -842,17 +842,13 @@ class Mono3DVGv2Model(Mono3DVGv2PreTrainedModel):
             )
 
         # Create language input projection layer
-        language_proj_list = []
-        for _ in range(config.num_text_output_layers):
-            in_channels = language_backbone.hidden_size
-            language_proj_list.append(
-                nn.Sequential(
-                    nn.Linear(in_channels, self.d_model, bias=True),
-                    nn.LayerNorm(self.d_model, eps=1e-12),
-                    nn.Dropout(0.1),
-                )
-            )
-        self.language_proj = nn.ModuleList(language_proj_list)
+        language_proj = nn.Sequential(
+            nn.Linear(language_backbone.hidden_size, self.d_model, bias=True),
+            nn.LayerNorm(self.d_model, eps=1e-12),
+            nn.Dropout(0.1),
+        )
+        self.language_proj = _get_clones(language_proj, config.num_text_output_layers)
+        # self.language_proj = nn.ModuleList([language_proj for _ in range(config.num_text_output_layers)])
         
         self.encoder = build_vision_language_encoder(config)
         self.decoder = Mono3DVGv2Decoder(config)
@@ -874,8 +870,8 @@ class Mono3DVGv2Model(Mono3DVGv2PreTrainedModel):
         """Get the valid ratio of all feature maps."""
 
         _, height, width = mask.shape
-        valid_height = torch.sum(mask[:, :, 0], 1)
-        valid_width = torch.sum(mask[:, 0, :], 1)
+        valid_height = torch.sum(~mask[:, :, 0], 1)
+        valid_width = torch.sum(~mask[:, 0, :], 1)
         valid_ratio_heigth = valid_height.float() / height
         valid_ratio_width = valid_width.float() / width
         valid_ratio = torch.stack([valid_ratio_width, valid_ratio_heigth], -1)
@@ -900,7 +896,7 @@ class Mono3DVGv2Model(Mono3DVGv2PreTrainedModel):
         device = pixel_values.device
         
         if pixel_mask is None:
-            pixel_mask = torch.zeros(((batch_size, height, width)), dtype=torch.long, device=device)
+            pixel_mask = torch.zeros(((batch_size, height, width)), dtype=torch.bool, device=device)
         
         # Extract multi-scale feature maps of same resolution `config.d_model` (cf Figure 4 in paper)
         # First, sent pixel_values + pixel_mask through Backbone to obtain the features which is a list of tuples
@@ -1353,7 +1349,9 @@ class Mono3DVGv2ForSingleObjectDetection(Mono3DVGv2PreTrainedModel):
                     new_key = new_key.replace('msdeform_attn', 'self_attn')
                     new_key = new_key.replace('norm1', 'self_attn_layer_norm')
                     new_key = new_key.replace('ca_text', 'cross_attn_text')
+                    new_key = new_key.replace('ca_img', 'cross_attn_img')
                     new_key = new_key.replace('catext_norm', 'cross_attn_text_layer_norm')
+                    new_key = new_key.replace('caimg_norm', 'cross_attn_img_layer_norm')
                     new_key = new_key.replace('linear1', 'fc1')
                     new_key = new_key.replace('linear2', 'fc2')
                     new_key = new_key.replace('norm2', 'final_layer_norm')
@@ -1371,10 +1369,13 @@ class Mono3DVGv2ForSingleObjectDetection(Mono3DVGv2PreTrainedModel):
                 new_key = key.replace('input_proj', 'model.input_proj')
             elif 'resizer' in key:
                 new_key = key.replace('resizer', 'model.language_proj')
-                if 'fc' in key:
-                    new_key = new_key.replace('fc', '0.0')
-                if 'layer_norm' in key:
-                    new_key = new_key.replace('layer_norm', '0.1')
+                # All language_proj layers share the same weights
+                for layer in range(config.num_text_output_layers):
+                    if 'fc' in key:
+                        language_proj_key = new_key.replace('fc', f'{layer}.0')
+                    if 'layer_norm' in key:
+                        language_proj_key = new_key.replace('layer_norm', f'{layer}.1')
+                    new_state_dict[language_proj_key] = value
             elif 'tgt_embed' in key:
                 new_key = key.replace('tgt_embed', 'model.target_embeddings')
             elif 'refpoint_embed' in key:

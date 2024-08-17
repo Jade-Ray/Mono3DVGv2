@@ -2,17 +2,14 @@ import math
 import datetime
 from pathlib import Path
 
-import torch
 from tqdm.auto import tqdm
 
 from utils.logging import get_file_handler
 from utils.parser import parse_args, load_config
 from lib.helpers.dataloader_helper import build_dataloader
 from lib.helpers.accelerator_helper import build_accelerator, init_accelerator, get_mp_logger as get_logger
-from lib.helpers.schedule_helper import build_lr_scheduler
-from lib.helpers.checkpoint_helper import CustomCheckpoint, get_resume_chekpoint_path, get_checkpoint_epoch, get_checkpoint_dir
+from lib.helpers.checkpoint_helper import CustomCheckpoint, get_resume_chekpoint_path
 from lib.helpers.metric_helper import evaluation
-from lib.helpers.huggingface_hub_helper import create_huggingface_hub_repo, upload_output_folder
 from lib.models.configuration_mono3dvg_v2 import Mono3DVGv2Config
 from lib.models.mono3dvg_v2 import Mono3DVGv2ForSingleObjectDetection as Mono3DVG
 from lib.models.image_processsing_mono3dvg import Mono3DVGImageProcessor
@@ -28,9 +25,7 @@ def main():
     accelerator = build_accelerator(cfg)
     # Handle the hugingface hub repo creation
     if accelerator.is_main_process:
-        if cfg.push_to_hub:
-            api, repo_id, hub_token = create_huggingface_hub_repo(cfg)
-        elif cfg.output_dir is not None:
+        if cfg.output_dir is not None:
             Path(cfg.output_dir).mkdir(parents=True, exist_ok=True)    
     accelerator.wait_for_everyone()
     
@@ -78,10 +73,7 @@ def main():
     logger.info(f"  Total test batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {cfg.gradient_accumulation_steps}")
     logger.info(f"  Total testing steps = {cfg.max_test_steps}")
-    
-    # Only show the progress bar once on each machine.
-    progress_bar = tqdm(range(cfg.max_test_steps), disable=not accelerator.is_local_main_process)
-    
+
     # custom checkpoint data registe to accelerator
     extra_state = CustomCheckpoint()
     accelerator.register_for_checkpointing(extra_state)
@@ -98,9 +90,9 @@ def main():
     for split_name in ['Overall', 'Unique', 'Multiple', 'Near', 'Medium', 'Far', 'Easy', 'Moderate', 'Hard']:
         logger.info(f"------------{split_name}------------")
         msg = (
-            f'Accuracy@0.25: {metrics[f"{split_name}_Acc@0.25"]}%\t'
-            f'Accuracy@0.5: {metrics[f"{split_name}_Acc@0.5"]}%\t'
-            f'Mean IoU: {metrics[f"{split_name}_MeanIoU"]}%\t'
+            f'Accuracy@0.25: {metrics[f"{split_name}_Acc@0.25"]:.2f}%\t'
+            f'Accuracy@0.5: {metrics[f"{split_name}_Acc@0.5"]:.2f}%\t'
+            f'Mean IoU: {metrics[f"{split_name}_MeanIoU"]:.2f}%\t'
         )
         logger.info(msg)
 

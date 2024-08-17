@@ -42,8 +42,10 @@ def build_accelerator(cfg: Namespace) -> Accelerator:
         project_config.set_directories(cfg.output_dir) # Set the project directory and logging directory to the output_dir
         accelerator_log_kwargs["project_config"] = project_config
     
+    mixed_precision = getattr(cfg, "mixed_precision", None)
     accelerator = Accelerator(
         gradient_accumulation_steps=cfg.gradient_accumulation_steps,
+        mixed_precision=mixed_precision,
         kwargs_handlers=[
             InitProcessGroupKwargs(timeout=timedelta(seconds=7200))  # a big number for high resolution or big dataset
         ],

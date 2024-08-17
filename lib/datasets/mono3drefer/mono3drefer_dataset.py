@@ -184,8 +184,8 @@ class Mono3DReferDataset(Dataset):
         
         self.mono3d_refer = Mono3DRefer(cfg.root_dir, split)
         self.ids = list(sorted(self.mono3d_refer.imgs.keys()))
-        self.id2label = self.mono3d_refer.label2id
-        self.label2id = {v: k for k, v in self.id2label.items()}
+        self.label2id = self.mono3d_refer.label2id
+        self.id2label = {v: k for k, v in self.label2id.items()}
         self.split = split
         self.max_objs = 1
         self.resolution = np.array([1280, 384])  # W * H
@@ -292,7 +292,10 @@ class Mono3DReferDataset(Dataset):
                 'instance_id': ann['instance_id'],
                 'anno_id': ann['ann_id'],
                 'bbox_downsample_ratio': img_size / features_size,
-                'gt_3dbox': [object.h,object.w,object.l,float(object.pos[0]),float(object.pos[1]),float(object.pos[2])] }
+                'gt_3dbox': np.array([
+                    object.h, object.w, object.l, object.pos[0], object.pos[1], object.pos[2]
+                    ], dtype=np.float32), 
+                }
 
         #  ============================   get labels   ==============================
         if random_flip_flag:
@@ -310,8 +313,6 @@ class Mono3DReferDataset(Dataset):
             if object.ry < -np.pi: object.ry += 2 * np.pi
 
         # labels encoding
-        calibs = np.zeros((self.max_objs, 3, 4), dtype=np.float32)
-        indices = np.zeros((self.max_objs), dtype=np.int64)
         mask_2d = np.zeros((self.max_objs), dtype=bool)
         labels = np.zeros((self.max_objs), dtype=np.int8)
         depth = np.zeros((self.max_objs, 1), dtype=np.float32)
@@ -387,8 +388,6 @@ class Mono3DReferDataset(Dataset):
         
         if object.trucation <= 0.5 and object.occlusion <= 2:
             mask_2d[0] = 1
-            
-        calibs[0] = calib.P2
         
         # language encoding
         text = ann['description'].lower()
@@ -396,7 +395,7 @@ class Mono3DReferDataset(Dataset):
         return {
             'pixel_values': img,
             'captions': text,
-            'calibs': calibs,
+            'calibs': calib.P2,
             'targets': {
                 'labels': labels,
                 'boxes': boxes,

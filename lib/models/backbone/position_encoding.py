@@ -15,7 +15,45 @@ import torch
 from torch import nn
 
 
-class SinePositionEmbedding(nn.Module):
+class DetrSinePositionEmbedding(nn.Module):
+    """
+    This is a more standard version of the position embedding, very similar to the one used by the Attention is all you
+    need paper, generalized to work on images.
+    """
+
+    def __init__(self, embedding_dim=64, temperature=10000, normalize=False, scale=None):
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.temperature = temperature
+        self.normalize = normalize
+        if scale is not None and normalize is False:
+            raise ValueError("normalize should be True if scale is passed")
+        if scale is None:
+            scale = 2 * math.pi
+        self.scale = scale
+
+    def forward(self, pixel_values, pixel_mask):
+        if pixel_mask is None:
+            raise ValueError("No pixel mask provided")
+        not_mask = ~pixel_mask
+        y_embed = not_mask.cumsum(1, dtype=torch.float32)
+        x_embed = not_mask.cumsum(2, dtype=torch.float32)
+        if self.normalize:
+            y_embed = y_embed / (y_embed[:, -1:, :] + 1e-6) * self.scale
+            x_embed = x_embed / (x_embed[:, :, -1:] + 1e-6) * self.scale
+
+        dim_t = torch.arange(self.embedding_dim, dtype=torch.int64, device=pixel_values.device).float()
+        dim_t = self.temperature ** (2 * torch.div(dim_t, 2, rounding_mode="floor") / self.embedding_dim)
+
+        pos_x = x_embed[:, :, :, None] / dim_t
+        pos_y = y_embed[:, :, :, None] / dim_t
+        pos_x = torch.stack((pos_x[:, :, :, 0::2].sin(), pos_x[:, :, :, 1::2].cos()), dim=4).flatten(3)
+        pos_y = torch.stack((pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4).flatten(3)
+        pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
+        return pos
+
+
+class DeformableDetrSinePositionEmbedding(nn.Module):
     """
     This is a more standard version of the position embedding, very similar to the one
     used by the Attention is all you need paper, generalized to work on images.
@@ -35,14 +73,15 @@ class SinePositionEmbedding(nn.Module):
     def forward(self, pixel_values, pixel_mask):
         if pixel_mask is None:
             raise ValueError("No pixel mask provided")
-        y_embed = pixel_mask.cumsum(1, dtype=torch.float32)
-        x_embed = pixel_mask.cumsum(2, dtype=torch.float32)
+        not_mask = ~pixel_mask
+        y_embed = not_mask.cumsum(1, dtype=torch.float32)
+        x_embed = not_mask.cumsum(2, dtype=torch.float32)
         if self.normalize:
             eps = 1e-6
             y_embed = (y_embed - 0.5) / (y_embed[:, -1:, :] + eps) * self.scale
             x_embed = (x_embed - 0.5) / (x_embed[:, :, -1:] + eps) * self.scale
 
-        dim_t = torch.arange(self.embedding_dim, dtype=torch.float32, device=pixel_values.device)
+        dim_t = torch.arange(self.embedding_dim, dtype=torch.int64, device=pixel_values.device).float()
         dim_t = self.temperature ** (2 * torch.div(dim_t, 2, rounding_mode="floor") / self.embedding_dim)
 
         pos_x = x_embed[:, :, :, None] / dim_t
@@ -82,7 +121,7 @@ def build_position_encoding(config):
     n_steps = config.d_model // 2
     if config.position_embedding_type == "sine":
         # TODO find a better way of exposing other arguments
-        position_embedding = SinePositionEmbedding(n_steps, normalize=True)
+        position_embedding = DeformableDetrSinePositionEmbedding(n_steps, normalize=True)
     elif config.position_embedding_type == "learned":
         position_embedding = LearnedPositionEmbedding(n_steps)
     else:

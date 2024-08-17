@@ -2,6 +2,9 @@
 gradient_accumulation_steps:
   desc: Number of updates steps to accumulate before performing a backward/update pass.
   value: 1
+mixed_precision:
+  desc: Whether to use mixed precision. Choose between fp116 and bf16(bfloat16). Bf16 requires PyTorch >= 1.10. and an Nvidia Ampere GPU.
+  value: 'no'
 with_tracking:
   desc: Whether to enable experiment trackers for logging.
   value: True

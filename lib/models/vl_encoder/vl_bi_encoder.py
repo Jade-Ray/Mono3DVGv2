@@ -204,10 +204,10 @@ class VisionLanguageBiEncoder(nn.Module):
         self.layers = nn.ModuleList([DeformableDetrEncoderLayer(config) for _ in range(config.encoder_layers)])
         self.fusion_layers = nn.ModuleList([
             BiAttentionBlock(
-                v_dim=config.hidden_dim,
-                l_dim=config.hidden_dim,
+                v_dim=config.d_model,
+                l_dim=config.d_model,
                 embed_dim=config.encoder_ffn_dim // 2,
-                num_heads=config.nheads // 2,
+                num_heads=config.encoder_attention_heads // 2,
                 dropout=0.1,
             ) for _ in range(config.encoder_layers)
         ])

@@ -8,7 +8,6 @@ __base__:
 with_tracking: False
 report_to: 'wandb'
 project_name: 'mono3dvg-v2'
-mixed_precision: 'no'
 
 # Dataset
 dataset:
@@ -25,10 +24,10 @@ model:
 
   # Text Encoder
   text_encoder_type: 'pretrained-models/roberta-base'
-  num_text_output_layers: 1
+  num_text_output_layers: 3
 
   # Vision-Language Encoder
-  vl_encoder_type: 'fusion'
+  vl_encoder_type: 'simple-bridge-tower'
   
   # Transformer
   with_box_refine: True
@@ -41,8 +40,8 @@ model:
   decoder_ffn_dim: 256
   num_queries: 1
   decoder_self_attn: False
-  decoder_depth_residual: False
-  decoder_text_residual: False
+  decoder_depth_residual: True
+  decoder_text_residual: True
   use_text_guided_adapter: True
 
 lr_scheduler:
@@ -52,11 +51,11 @@ lr_scheduler:
   decay_list: [40]
 
 # Training
-output_dir: outputs/vl-swin-dab
+output_dir: outputs/simple-bridge-swin-dab
 num_train_epochs: 60
 dataloader_num_workers: 0
-train_batch_size: &batch_size 12
+train_batch_size: &batch_size 10
 valid_batch_size: *batch_size
 test_batch_size: *batch_size
-mono3dvg_model: 'pretrained-models/mono3dvg-vl-swin-dab/checkpoint_best.pth'
+mono3dvg_model: 'pretrained-models/mono3dvg-simple-bridge-swin-dab/checkpoint_best.pth'
 pretrain_model: null

@@ -179,7 +179,7 @@ def main():
             f'Mean IoU: {metrics['Overall_MeanIoU']}%\t'
         )
         logger.info(f"Final Evaluation Result: " + msg)
-        eval_result = metrics['Overall_Acc@0.25'] + metrics['Overall_Acc@0.25']
+        eval_result = metrics['Overall_Acc@0.25'] + metrics['Overall_Acc@0.5']
         if eval_result > extra_state.best_result:
             extra_state.best_eval_result = eval_result
             extra_state.best_epoch = epoch

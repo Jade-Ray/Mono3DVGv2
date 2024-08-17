@@ -39,7 +39,7 @@ def main():
     logger.info(f'Init accelerator...\n{accelerator.state}', main_process_only=False)
     
     logger.info("Init DataLoader...")
-    train_dataloader, valid_dataloader, _, id2label, label2id = build_dataloader(
+    train_dataloader, _, valid_dataloader, id2label, label2id = build_dataloader(
         cfg, workers=cfg.dataloader_num_workers, accelerator=accelerator
     )
     
@@ -169,14 +169,24 @@ def main():
                     f'loss_depth_map: {losses_dict['loss_depth_map']:.2f}\t'
                 )
                 logger.info(msg)
+                if cfg.with_tracking:
+                    accelerator.log(
+                        {
+                            "lr": lr_scheduler.get_last_lr()[0],
+                            **losses_dict,
+                            "epoch": epoch,
+                            "step": completed_steps,
+                        }, 
+                        step=completed_steps,
+                    )
         logger.info(f'Final Training Loss: {losses_dict['loss']}')
         
         logger.info("***** Running evaluation *****")
         metrics = evaluation(model, image_processor, accelerator, valid_dataloader, epoch, logger)
         msg = (
-            f'Accuracy@0.25: {metrics['Overall_Acc@0.25']}%\t'
-            f'Accuracy@0.5: {metrics['Overall_Acc@0.5']}%\t'
-            f'Mean IoU: {metrics['Overall_MeanIoU']}%\t'
+            f'Accuracy@0.25: {metrics['Overall_Acc@0.25']:.2f}%\t'
+            f'Accuracy@0.5: {metrics['Overall_Acc@0.5']::.2f}%\t'
+            f'Mean IoU: {metrics['Overall_MeanIoU']:.2f}%\t'
         )
         logger.info(f"Final Evaluation Result: " + msg)
         eval_result = metrics['Overall_Acc@0.25'] + metrics['Overall_Acc@0.5']
@@ -187,16 +197,7 @@ def main():
             logger.info(f"Best Result: {extra_state.best_eval_result}, epoch: {epoch}")
         
         if cfg.with_tracking:
-            accelerator.log(
-                {
-                    "lr": lr_scheduler.get_last_lr()[0],
-                    **losses_dict,
-                    **metrics,
-                    "epoch": epoch,
-                    "step": completed_steps,
-                }, 
-                step=completed_steps,
-            )
+            accelerator.log(metrics, step=completed_steps,)
         
         # Svae model
         if cfg.push_to_hub and epoch < cfg.num_train_epochs - 1:

@@ -5,7 +5,7 @@ __base__:
   - __base__/mono3drefer_dataset.yaml
 
 # Accelerator
-with_tracking: False
+with_tracking: True
 report_to: 'wandb'
 project_name: 'mono3dvg-v2'
 mixed_precision: 'no'

@@ -163,6 +163,7 @@ cython_debug/
 
 # Output log
 outputs/
+wandb/
 
 # Checkpoint
 *.pth

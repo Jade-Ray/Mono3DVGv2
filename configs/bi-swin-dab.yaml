@@ -5,9 +5,10 @@ __base__:
   - __base__/mono3drefer_dataset.yaml
 
 # Accelerator
-with_tracking: False
+with_tracking: True
 report_to: 'wandb'
 project_name: 'mono3dvg-v2'
+mixed_precision: 'no'
 
 # Dataset
 dataset:
@@ -44,11 +45,12 @@ model:
   decoder_text_residual: True
   use_text_guided_adapter: True
 
+learning_rate: 5.0e-5
 lr_scheduler:
-  type: multi_step
+  type: cosine
   num_warmup_steps: 500
-  decay_rate: 0.1
-  decay_list: [40]
+  # decay_rate: 0.1
+  # decay_list: [40]
 
 # Training
 output_dir: outputs/bi-swin-dab

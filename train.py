@@ -116,13 +116,14 @@ def main():
     
     # custom checkpoint data registe to accelerator
     extra_state = CustomCheckpoint()
-    accelerator.register_for_checkpointing(extra_state)
     
     # Potentially load in the weights and states from a previous save
     if cfg.resume_from_checkpoint:
         checkpoint_path = get_resume_chekpoint_path(cfg.resume_from_checkpoint, cfg.output_dir)
         accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
+        accelerator.register_for_checkpointing(extra_state)
         accelerator.load_state(checkpoint_path)
+        logger.info(f"Loading Checkpoint... Best Result:{extra_state.best_result}, Best Epoch:{extra_state.best_epoch}")
         if extra_state.epoch > 0:
             starting_epoch = extra_state.epoch + 1
         else:
@@ -191,10 +192,12 @@ def main():
         logger.info(f"Final Evaluation Result: " + msg)
         eval_result = metrics['Overall_Acc@0.25'] + metrics['Overall_Acc@0.5']
         if eval_result > extra_state.best_result:
-            extra_state.best_eval_result = eval_result
+            extra_state.best_result = eval_result
             extra_state.best_epoch = epoch
+            accelerator._custom_objects.clear()
+            accelerator.register_for_checkpointing(extra_state)
             accelerator.save_state(get_checkpoint_dir(cfg.output_dir) / 'best')
-            logger.info(f"Best Result: {extra_state.best_eval_result}, epoch: {epoch}")
+            logger.info(f"Best Result: {extra_state.best_result}, epoch: {extra_state.best_epoch}")
         
         if cfg.with_tracking:
             accelerator.log(metrics, step=completed_steps,)
@@ -214,6 +217,8 @@ def main():
         
         # Save checkpoint
         extra_state.epoch = epoch
+        accelerator._custom_objects.clear()
+        accelerator.register_for_checkpointing(extra_state)
         accelerator.save_state(get_checkpoint_dir(cfg.output_dir) / 'latest')
 
 

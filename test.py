@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 def main():
     args = parse_args()
     cfg = load_config(args, args.cfg_file)
+    cfg.with_tracking = False
     
     accelerator = build_accelerator(cfg)
     # Handle the hugingface hub repo creation
@@ -42,10 +43,7 @@ def main():
     config = Mono3DVGv2Config(
         label2id=label2id, id2label=id2label, **vars(cfg.model)
     )
-    if hasattr(cfg, 'mono3dvg_model') and cfg.mono3dvg_model is not None:
-        model = Mono3DVG._load_mono3dvg_pretrained_model(cfg.mono3dvg_model, config, logger=logger)
-    else:
-        model = Mono3DVG(config)
+    model = Mono3DVG(config)
     image_processor = Mono3DVGImageProcessor()
     
     
@@ -76,13 +74,14 @@ def main():
 
     # custom checkpoint data registe to accelerator
     extra_state = CustomCheckpoint()
-    accelerator.register_for_checkpointing(extra_state)
     
     # Potentially load in the weights and states from a previous save
     if cfg.pretrain_model:
         checkpoint_path = get_resume_chekpoint_path(cfg.pretrain_model, cfg.output_dir)
         accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
+        accelerator.register_for_checkpointing(extra_state)
         accelerator.load_state(checkpoint_path)
+        logger.info(f"Loading Checkpoint... Best Result:{extra_state.best_result}, Best Epoch:{extra_state.best_epoch}")
     
     logger.info("***** Running evaluation *****")
     metrics = evaluation(model, image_processor, accelerator, test_dataloader, 

@@ -45,11 +45,12 @@ model:
   decoder_text_residual: False
   use_text_guided_adapter: True
 
+learning_rate: 1.0e-4
 lr_scheduler:
-  type: multi_step
+  type: cosine
   num_warmup_steps: 500
-  decay_rate: 0.1
-  decay_list: [40]
+  # decay_rate: 0.1
+  # decay_list: [40]
 
 # Training
 output_dir: outputs/vl-swin-dab
@@ -59,4 +60,4 @@ train_batch_size: &batch_size 12
 valid_batch_size: *batch_size
 test_batch_size: *batch_size
 mono3dvg_model: 'pretrained-models/mono3dvg-vl-swin-dab/checkpoint_best.pth'
-pretrain_model: null
+pretrain_model: 'outputs/vl-swin-dab/checkpoints/best'

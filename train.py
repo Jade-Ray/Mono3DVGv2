@@ -47,8 +47,10 @@ def main():
     config = Mono3DVGv2Config(
         label2id=label2id, id2label=id2label, **vars(cfg.model)
     )
-    if hasattr(cfg, 'mono3dvg_model') and cfg.mono3dvg_model is not None:
-        model = Mono3DVG._load_mono3dvg_pretrained_model(cfg.mono3dvg_model, config, logger=logger)
+    if hasattr(cfg, 'pretrain_model') and cfg.pretrain_model is not None:
+        model = Mono3DVG.from_pretrained(cfg.pretrain_model, config=config, cache_dir=cfg.cache_dir)
+    elif hasattr(cfg, 'mono3dvg_model') and cfg.mono3dvg_model is not None:
+        model = Mono3DVG._load_mono3dvg_pretrain_model(cfg.mono3dvg_model, config, logger=logger)
     else:
         model = Mono3DVG(config)
     image_processor = Mono3DVGImageProcessor()

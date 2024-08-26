@@ -60,4 +60,4 @@ train_batch_size: &batch_size 10
 valid_batch_size: *batch_size
 test_batch_size: *batch_size
 mono3dvg_model: 'pretrained-models/mono3dvg-bi-swin-dab/checkpoint_best.pth'
-pretrain_model: null
+pretrain_model: 'outputs/bi-swin-dab/checkpoints/latest'

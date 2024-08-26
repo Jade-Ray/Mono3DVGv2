@@ -1310,7 +1310,7 @@ class Mono3DVGv2ForSingleObjectDetection(Mono3DVGv2PreTrainedModel):
         return dict_outputs
 
     @classmethod
-    def _load_mono3dvg_pretrained_model(
+    def _load_mono3dvg_pretrain_model(
         cls,
         pretrained_model_name_or_path: Optional[Union[str, os.PathLike]],
         config: Optional[Union[Mono3DVGv2Config, dict]] = None,

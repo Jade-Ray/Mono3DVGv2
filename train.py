@@ -202,7 +202,7 @@ def main():
             logger.info(f"Best Result: {extra_state.best_result}, epoch: {extra_state.best_epoch}")
         
         if cfg.with_tracking:
-            accelerator.log(metrics, step=completed_steps,)
+            accelerator.log({"eval_result": eval_result, **metrics}, step=completed_steps,)
         
         # Svae model
         if cfg.push_to_hub and epoch < cfg.num_train_epochs - 1:

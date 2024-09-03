@@ -689,7 +689,7 @@ class Mono3DVGv2Decoder(Mono3DVGv2PreTrainedModel):
             
             # DAB
             if self.use_dab:
-                query_sine_embed = gen_sineembed_for_position(reference_points_input[:, :, 0, :]) # bs, nq, 256*3 
+                query_sine_embed = gen_sineembed_for_position(reference_points_input[:, :, 0, :], n_steps=self.d_model // 2) # bs, nq, 256*3 
                 raw_query_pos = self.ref_point_head(query_sine_embed) # bs, nq, 256
                 pos_scale = self.query_scale(hidden_states) if idx != 0 else 1
                 position_embeddings = pos_scale * raw_query_pos

@@ -1386,7 +1386,7 @@ class Mono3DVGv2ForSingleObjectDetection(Mono3DVGv2PreTrainedModel):
             if new_key in model_state_dict and value.shape != model_state_dict[new_key].shape:
                 logger.info(f"Skip loading parameter: {new_key}, "
                             f"required shape: {model_state_dict[new_key].shape}, "
-                            f"loaded shape: {state_dict[new_key].shape}")
+                            f"loaded shape: {state_dict[key].shape}")
                 continue
             new_state_dict[new_key] = value
 

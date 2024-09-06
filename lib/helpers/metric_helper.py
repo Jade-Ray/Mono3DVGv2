@@ -143,7 +143,7 @@ def evaluation(
     
     for step, batch in enumerate(tqdm(dataloader, disable=not accelerator.is_local_main_process)):
         batch = Mono3DVGImageProcessor.prepare_batch(batch, return_info=True)
-        info = nested_to_cpu(batch.pop("info"))
+        info = batch.pop("info")
         with torch.no_grad():
             outputs = model(**batch)
         
@@ -152,7 +152,6 @@ def evaluation(
         # 1. Collect predicted 3Dboxes, classes, scores
         # image_processor convert boxes from size_3d, box and depth predict to Real 3D box format [cx, cy, cz, h, w, l] in absolute coordinates.
         predictions = image_processor.post_process_3d_object_detection(outputs, batch["calibs"], target_sizes=batch["img_sizes"], top_k=1)
-        predictions = nested_to_cpu(predictions)
 
         # 2. Collect ground truth boxes in the same format for metric computation
         # Do the same, convert 3D boxes to Pascal VOC format
@@ -160,7 +159,11 @@ def evaluation(
         for gt_3dbox, instance_id in zip(info['gt_3dbox'], info['instance_id']):
             target.append({"boxes_3d": gt_3dbox, "instance_id": instance_id})
         
-        metric.update(predictions, target)
+        all_predictions, all_tragets = accelerator.gather_for_metrics((predictions, target))
+        all_predictions = nested_to_cpu(all_predictions)
+        all_tragets = nested_to_cpu(all_tragets)
+        
+        metric.update(all_predictions, all_tragets)
         
         if step % 30 == 0 and logger is not None:
             metrics = metric.compute(only_overall=True)

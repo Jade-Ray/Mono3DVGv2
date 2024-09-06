@@ -74,43 +74,61 @@ class IOU3DMetric(object):
                 f"Expected argument `preds` and `target` to have the same length, but got {len(preds)} and {len(targets)}"
             )
     
-    def update(self, preds: List[Dict[str, np.ndarray]], target: List[Dict[str, np.ndarray]]) -> None:
+    def update(self, preds: List[Dict[str, np.ndarray]], target: List[Dict[str, np.ndarray]], num_processes: int = 1) -> None:
         """Update metric state."""
         
         self._input_validator(preds, target)
         
         for pred_item, gt_item in zip(preds, target):
-            pred_box3D = pred_item['boxes_3d'][0] # Only calculate for top-1 prediction
+            pred_box3D = pred_item['boxes_3d'] 
             gt_box3D = gt_item['boxes_3d']
             instanceID = gt_item['instance_id']
-            # (dim, loc) -> (loc, dim)
-            pred_box3D = np.array([pred_box3D[3], pred_box3D[4], pred_box3D[5], pred_box3D[0], pred_box3D[1], pred_box3D[2]], dtype=np.float32)
-            gt_box3D = np.array([gt_box3D[3], gt_box3D[4], gt_box3D[5], gt_box3D[0], gt_box3D[1], gt_box3D[2]], dtype=np.float32)
-            # real 3D center in 3D space is (x, y, z) - (0, h/2, 0)
-            pred_box3D[1] -= pred_box3D[3] / 2
-            gt_box3D[1] -= gt_box3D[3] / 2
-            
-            iou = calculate_3DIoU(pred_box3D, gt_box3D)
-            self.iou_3dbox['Overall'].append(iou)
-            if instanceID in self.test_instanceID_split['Unique']:
-                self.iou_3dbox['Unique'].append(iou)
+            # for distributed evaluation, grouped item should manully operate
+            if num_processes > 1:
+                assert instanceID.shape[0] == pred_box3D.shape[0]
+                # gathers input_data and potentially drops duplicates in the last batch if on a distributed system
+                # so recalculate gt
+                box_dim = pred_box3D.shape[1]
+                num_gt = torch.div(gt_box3D.shape[0], box_dim, rounding_mode='floor')
+                num_drop = gt_box3D.shape[0] % box_dim
+                if not num_drop == 0:
+                    gt_box3D = gt_box3D[:-num_drop]
+                gt_box3D = gt_box3D.split([box_dim for _ in range(num_gt)])
+                for pred, gt, id in zip(pred_box3D, gt_box3D, instanceID):
+                    self._update_item(pred, gt, id)
             else:
-                self.iou_3dbox['Multiple'].append(iou)
-            
-            if instanceID in self.test_instanceID_split['Near']:
-                self.iou_3dbox['Near'].append(iou)
-            elif instanceID in self.test_instanceID_split['Medium']:
-                self.iou_3dbox['Medium'].append(iou)
-            elif instanceID in self.test_instanceID_split['Far']:
-                self.iou_3dbox['Far'].append(iou)
-            
-            if instanceID in self.test_instanceID_split['Easy']:
-                self.iou_3dbox['Easy'].append(iou)
-            elif instanceID in self.test_instanceID_split['Moderate']:
-                self.iou_3dbox['Moderate'].append(iou)
-            elif instanceID in self.test_instanceID_split['Hard']:
-                self.iou_3dbox['Hard'].append(iou)
+                pred_box3D = pred_box3D[0] # Only calculate for top-1 prediction
+                self._update_item(pred_box3D, gt_box3D, instanceID)
     
+    def _update_item(self, pred_box3D, gt_box3D, instanceID):
+        # (dim, loc) -> (loc, dim)
+        pred_box3D = np.array([pred_box3D[3], pred_box3D[4], pred_box3D[5], pred_box3D[0], pred_box3D[1], pred_box3D[2]], dtype=np.float32)
+        gt_box3D = np.array([gt_box3D[3], gt_box3D[4], gt_box3D[5], gt_box3D[0], gt_box3D[1], gt_box3D[2]], dtype=np.float32)
+        # real 3D center in 3D space is (x, y, z) - (0, h/2, 0)
+        pred_box3D[1] -= pred_box3D[3] / 2
+        gt_box3D[1] -= gt_box3D[3] / 2
+            
+        iou = calculate_3DIoU(pred_box3D, gt_box3D)
+        self.iou_3dbox['Overall'].append(iou)
+        if instanceID in self.test_instanceID_split['Unique']:
+            self.iou_3dbox['Unique'].append(iou)
+        else:
+            self.iou_3dbox['Multiple'].append(iou)
+            
+        if instanceID in self.test_instanceID_split['Near']:
+            self.iou_3dbox['Near'].append(iou)
+        elif instanceID in self.test_instanceID_split['Medium']:
+            self.iou_3dbox['Medium'].append(iou)
+        elif instanceID in self.test_instanceID_split['Far']:
+            self.iou_3dbox['Far'].append(iou)
+            
+        if instanceID in self.test_instanceID_split['Easy']:
+            self.iou_3dbox['Easy'].append(iou)
+        elif instanceID in self.test_instanceID_split['Moderate']:
+            self.iou_3dbox['Moderate'].append(iou)
+        elif instanceID in self.test_instanceID_split['Hard']:
+            self.iou_3dbox['Hard'].append(iou)
+
     def compute(self, only_overall: bool = True) -> dict:
         """Compute the metric."""
         result_dict = {}
@@ -159,11 +177,11 @@ def evaluation(
         for gt_3dbox, instance_id in zip(info['gt_3dbox'], info['instance_id']):
             target.append({"boxes_3d": gt_3dbox, "instance_id": instance_id})
         
-        all_predictions, all_tragets = accelerator.gather_for_metrics((predictions, target))
+        all_predictions, all_targets = accelerator.gather_for_metrics((predictions, target))
         all_predictions = nested_to_cpu(all_predictions)
-        all_tragets = nested_to_cpu(all_tragets)
+        all_targets = nested_to_cpu(all_targets)
         
-        metric.update(all_predictions, all_tragets)
+        metric.update(all_predictions, all_targets, num_processes=accelerator.num_processes)
         
         if step % 30 == 0 and logger is not None:
             metrics = metric.compute(only_overall=True)

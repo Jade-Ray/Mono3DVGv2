@@ -591,7 +591,8 @@ class Mono3DVGv2Decoder(Mono3DVGv2PreTrainedModel):
         self.use_dab = config.use_dab
         if self.use_dab:
             self.d_model = config.d_model
-            self.query_scale = MLP(config.d_model, config.d_model, config.d_model, 2)
+            if config.decoder_layers > 1: # first layer not scale
+                self.query_scale = MLP(config.d_model, config.d_model, config.d_model, 2)
             self.ref_point_head = MLP(3 * config.d_model, config.d_model, config.d_model, 2)
         
         # Initialize weights and apply final processing

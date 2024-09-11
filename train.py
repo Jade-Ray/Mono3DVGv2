@@ -48,7 +48,7 @@ def main():
         label2id=label2id, id2label=id2label, **vars(cfg.model)
     )
     if hasattr(cfg, 'pretrain_model') and cfg.pretrain_model is not None:
-        model = Mono3DVG.from_pretrained(cfg.pretrain_model, config=config, cache_dir=cfg.cache_dir)
+        model = Mono3DVG.from_pretrained(cfg.pretrain_model, config=config, cache_dir=cfg.cache_dir, ignore_mismatched_sizes=True)
     elif hasattr(cfg, 'mono3dvg_model') and cfg.mono3dvg_model is not None:
         model = Mono3DVG._load_mono3dvg_pretrain_model(cfg.mono3dvg_model, config, logger=logger)
     else:

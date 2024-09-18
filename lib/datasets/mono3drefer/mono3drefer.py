@@ -1,10 +1,14 @@
+import copy
 from functools import partial
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional, List, Union, Dict
 from argparse import Namespace
+from tqdm import tqdm
+from collections import defaultdict
 
 import albumentations as A
 import numpy as np
 from datasets import load_dataset
+from datasets.utils.typing import ListLike
 
 from accelerate import Accelerator
 from transformers.image_processing_utils import BatchFeature
@@ -15,6 +19,80 @@ from lib.datasets.mono3drefer.utils import Calibration, generate_corners3d, affi
 from lib.datasets.transforms import PhotometricDistort, HorizontalFlip, Affine, NoOp
 from lib.models.image_processsing_mono3dvg import Mono3DVGImageProcessor
 from utils.parser import dict_to_namespace
+
+
+class SingleObjectMono3DRefer():
+    def __init__(self, single_object_list, image_list, calib_list):
+        assert len(image_list) == len(calib_list), "Image and Calib list must have the same length"
+        self._data = single_object_list
+        self._image_list = image_list
+        self._calib_list = calib_list
+    
+    @classmethod
+    def from_multi_object_ds(cls, multi_object_ds):
+        single_object_list = []
+        pbar = tqdm(enumerate(multi_object_ds))
+        for img_index, data in pbar:
+            pbar.set_description(f"Index [{img_index}/{len(multi_object_ds)}]")
+            for i, _ in enumerate(data['info']['instance_id']):
+                description = data['info']['description'][i]
+                for split_description in description.split('//'):
+                    info = {k: v[i] for k, v in data['info'].items() if k != 'description'}
+                    info['ann_id'] = i
+                    single_object_list.append({
+                        'image_index': img_index,
+                        'description': split_description,
+                        'object': {k: v[i] for k, v in data['objects'].items()},
+                        'info': info,
+                    })
+        return cls(single_object_list, multi_object_ds['image'], multi_object_ds['calib'])
+    
+    def set_transform(self, transform: Optional[callable]):
+        self._transform = transform
+    
+    def with_transform(self, transform: Optional[callable]):
+        dataset = copy.deepcopy(self)
+        dataset.set_transform(transform=transform)
+        return dataset
+    
+    def __len__(self):
+        return len(self._data)
+    
+    def query_data(self, key: Union[int, slice, ListLike[int]]) -> List:
+        if isinstance(key, int):
+            key = [key]
+        elif isinstance(key, slice):
+            key = range(*key.indices(len(self)))
+        
+        data_list = []
+        for k in key:
+            data = self._data[k].copy()
+            image_index = data.pop('image_index')
+            data['image'] = self._image_list[image_index].copy()
+            data['calib'] = self._calib_list[image_index].copy()
+            data_list.append(data)
+        return data_list
+    
+    def _getitem(self, key: Union[int, slice, ListLike[int]]) -> Union[Dict, List]:
+        """
+        Can be used to index columns (by string names) or rows (by integer, slice, or list-like of integer indices)
+        """
+        batch = defaultdict(list)
+        for data in self.query_data(key):
+            for k, v in data.items():
+                batch[k].append(v)
+        if getattr(self, '_transform', None) is not None:
+            return self._transform(batch)
+        return batch
+    
+    def __getitem__(self, key):
+        return self._getitem(key)
+    
+    def __getitems__(self, keys: List) -> List:
+        """Can be used to get a batch using a list of integers indices."""
+        batch = self.__getitem__(keys)
+        n_examples = len(batch[next(iter(batch))])
+        return [{col: array[i] for col, array in batch.items()} for i in range(n_examples)]
 
 
 def format_object3d_annotations(caption: str, calib: Calibration, object: Namespace, info: Namespace) -> dict:
@@ -82,19 +160,19 @@ def augment_and_transform_batch(
 
     images = []
     annotations = []
-    for image, caption, calib, object, info in zip(examples["image"], examples['description'], examples['calib'], examples["objects"], examples["info"]):
+    for image, caption, calib, object, info in zip(examples["image"], examples['description'], examples['calib'], examples["object"], examples["info"]):
         image = np.array(image.convert("RGB"))
         calib = Calibration({k: np.array(v, dtype=np.float32) for k, v in calib.items()})
         
         # 3D object
-        object = dict_to_namespace({k: np.array(v[0]) if isinstance(v[0], list) else v[0] for k, v in object.items()})
+        object = dict_to_namespace({k: np.array(v) if isinstance(v, list) else v for k, v in object.items()})
         center_3d = object.pos + [0, -object.h / 2, 0]  # real 3D center in 3D space
         center_3d = center_3d.reshape(-1, 3)  # shape adjustment (N, 3)
         center_3d, _ = calib.rect_to_img(center_3d)  # project 3D center to image plane
         object.center_3d = center_3d[0]  # shape adjustment
         
         # info
-        info = dict_to_namespace({k: np.array(v[0]) if isinstance(v[0], list) else v[0] for k, v in info.items()})
+        info = dict_to_namespace({k: np.array(v) if isinstance(v, list) else v for k, v in info.items()})
         info.bbox_downsample_ratio = info.img_size / (np.array([1280, 384]) // 32)
         info.gt_3dbox = [object.h, object.w, object.l, float(object.pos[0]), float(object.pos[1]), float(object.pos[2])]
         # corner_3d        
@@ -152,6 +230,11 @@ def build_dataset(cfg, accelerator: Accelerator = None):
     validation_transform_batch = partial(
         augment_and_transform_batch, transform=validation_transform, image_processor=image_processor
     )
+    
+    # convert to SingleObjectMono3DRefer
+    dataset["train"] = SingleObjectMono3DRefer.from_multi_object_ds(dataset["train"])
+    dataset["val"] = SingleObjectMono3DRefer.from_multi_object_ds(dataset["val"])
+    dataset["test"] = SingleObjectMono3DRefer.from_multi_object_ds(dataset["test"])
     
     if accelerator is None:
         train_dataset = dataset["train"].with_transform(train_transform_batch)

@@ -245,6 +245,8 @@ class Mono3DVGPlotter:
         Returns:
             A list of PIL images.
         """
+        if not images.device.type == 'cpu':
+            images = images.cpu()
         if images.dim() == 3:
             images = images.unsqueeze(0)
         if images.dim() != 4:
@@ -315,6 +317,8 @@ class Mono3DVGPlotter:
             image = convert_pil2mat(image)
         
         boxes3d = boxes3d.astype(int)
+        if boxes3d.ndim == 2:
+            boxes3d = boxes3d.reshape(-1, 8, 2)
         for i, box3d in enumerate(boxes3d):
             if random_color:
                 color = cls._rcg(i)

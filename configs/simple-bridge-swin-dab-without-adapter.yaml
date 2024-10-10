@@ -1,0 +1,59 @@
+__base__:
+  - __base__/base.yaml
+  - __base__/accelerator.yaml
+  - __base__/hub.yaml
+  - __base__/mono3drefer_dataset.yaml
+
+# Accelerator
+with_tracking: True
+report_to: 'wandb'
+project_name: 'mono3dvg-v2'
+
+# Dataset
+dataset:
+  root_dir: './Mono3DRefer/'
+
+model:
+  num_labels: 9
+
+  # Backbone
+  use_timm_backbone: True
+  backbone: 'swin_large_patch4_window7_224'
+  pretrained_backbone_path: 'pretrained-models/swin_large_patch4_window7_224/model.safetensors'
+  num_feature_levels: 4
+
+  # Text Encoder
+  text_encoder_type: 'pretrained-models/roberta-base'
+  num_text_output_layers: 6
+
+  # Vision-Language Encoder
+  vl_encoder_type: 'simple-bridge-tower'
+  
+  # Transformer
+  with_box_refine: True
+  two_stage: False
+  use_dab: True
+  encoder_layers: 6
+  decoder_layers: 3
+  d_model: 256
+  encoder_ffn_dim: 256
+  decoder_ffn_dim: 256
+  num_queries: 1
+  decoder_self_attn: False
+  decoder_depth_residual: False
+  decoder_text_residual: False
+  use_text_guided_adapter: False
+
+learning_rate: 5.0e-5
+lr_scheduler:
+  type: cosine
+  num_warmup_steps: 500
+
+# Training
+output_dir: outputs/simple-bridge-swin-dab-without-adapter-6l
+num_train_epochs: 60
+dataloader_num_workers: 0
+train_batch_size: &batch_size 8
+valid_batch_size: 32
+test_batch_size: 32
+pretrain_model: 'outputs/simple-bridge-swin-dab-without-adapter-6l/checkpoints/best'

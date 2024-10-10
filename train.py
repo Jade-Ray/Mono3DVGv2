@@ -39,7 +39,7 @@ def main():
     logger.info(f'Init accelerator...\n{accelerator.state}', main_process_only=False)
     
     logger.info("Init DataLoader...")
-    train_dataloader, _, valid_dataloader, id2label, label2id = build_dataloader(
+    train_dataloader, valid_dataloader, _, id2label, label2id = build_dataloader(
         cfg, workers=cfg.dataloader_num_workers, accelerator=accelerator
     )
     

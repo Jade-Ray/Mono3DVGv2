@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from .pd import PhotometricDistort
-from .utils import Calibration, get_affine_transform, affine_transform
+from .utils import Calibration, get_affine_transform, affine_transform, generate_corners3d
 from lib.datasets.utils import angle2class
 
 
@@ -391,6 +391,11 @@ class Mono3DReferDataset(Dataset):
         
         # language encoding
         text = ann['description'].lower()
+        
+        # corner_3d
+        corner_3d = generate_corners3d(object.l, object.h, object.w, object.ry, object.pos) # (3, 8)
+        info['ry'] = object.ry
+        info['corner_3d'], _ = calib.rect_to_img(corner_3d) # (8, 2)
         
         return {
             'pixel_values': img,

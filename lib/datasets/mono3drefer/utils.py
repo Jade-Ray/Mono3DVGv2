@@ -32,9 +32,10 @@ class Calibration(object):
             calib = calib_file
 
         self.P2 = calib['P2']  # 3 x 4
-        self.R0 = calib['R0']  # 3 x 3
-        self.V2C = calib['Tr_velo2cam']  # 3 x 4
-        self.C2V = self.inverse_rigid_trans(self.V2C)
+        if 'R0' in calib and 'Tr_velo2cam' in calib:   
+            self.R0 = calib['R0']  # 3 x 3
+            self.V2C = calib['Tr_velo2cam']  # 3 x 4
+            self.C2V = self.inverse_rigid_trans(self.V2C)
 
         # Camera intrinsics and extrinsics
         self.cu = self.P2[0, 2]
@@ -62,6 +63,10 @@ class Calibration(object):
                 'P3': P3.reshape(3, 4),
                 'R0': R0.reshape(3, 3),
                 'Tr_velo2cam': Tr_velo_to_cam.reshape(3, 4)}
+
+    @classmethod
+    def get_calib_from_P2(cls, P2):
+        return cls({'P2': P2})
 
     def cart_to_hom(self, pts):
         """

@@ -271,7 +271,9 @@ uncertainty loss in the object detection loss.
         self.depth_map_loss_coefficient = depth_map_loss_coefficient
         self.focal_alpha = focal_alpha
         self.disable_custom_kernels = disable_custom_kernels
-        super().__init__(is_encoder_decoder=True, **kwargs)
+        if 'is_encoder_decoder' not in kwargs:
+            kwargs['is_encoder_decoder'] = True
+        super().__init__(**kwargs)
     
     @property
     def num_attention_heads(self) -> int:
